@@ -10,6 +10,7 @@ coverage.html
 /mnt/
 .env
 .env.*
+!.env.example
 .DS_Store
 
 # Local design and agent instructions

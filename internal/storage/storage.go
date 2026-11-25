@@ -52,3 +52,7 @@ type Capacity struct {
 type CapacityReporter interface {
 	Capacity() (Capacity, error)
 }
+
+// ContentVerifier lets recovery check referenced remote blocks before deleting
+// abandoned files. Ordinary opens need not inspect every block in a large file.
+type ContentVerifier interface{ Verify(key string) error }

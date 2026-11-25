@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"example.com/dfs/internal/app"
 	"example.com/dfs/internal/vfs"
 
 	"github.com/jacobsa/fuse/fuseops"
@@ -20,7 +19,7 @@ import (
 
 func openFS(t *testing.T, directory string) *vfs.FS {
 	t.Helper()
-	files, err := app.Open(directory)
+	files, err := openEmbedded(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +246,7 @@ func TestConcurrentAppend(t *testing.T) {
 func TestBackingDirectoryLockAndNamespaceIsolation(t *testing.T) {
 	data := t.TempDir()
 	files := openFS(t, data)
-	if second, err := app.Open(data); err == nil {
+	if second, err := openEmbedded(data); err == nil {
 		if err := second.Close(); err != nil {
 			t.Error(err)
 		}

@@ -8,6 +8,9 @@ import (
 	"sync"
 	"testing"
 
+	"example.com/dfs/internal/chunk"
+	"example.com/dfs/internal/metadata/redis"
+	"example.com/dfs/internal/metadata/redistest"
 	"example.com/dfs/internal/storage"
 	"example.com/dfs/internal/storage/disk"
 	"example.com/dfs/internal/storage/memory"
@@ -17,6 +20,18 @@ import (
 // to verify that VFS can use them without changing filesystem operations.
 func TestStorageAdapters(t *testing.T) {
 	for name, open := range map[string]func(*testing.T) storage.Engine{
+		"chunk": func(t *testing.T) storage.Engine {
+			meta, err := redis.Open(redistest.Config(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = meta.Close() })
+			store, err := chunk.New(memory.NewObjects(), meta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return store
+		},
 		"disk": func(t *testing.T) storage.Engine {
 			store, err := disk.Open(t.TempDir())
 			if err != nil {

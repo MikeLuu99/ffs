@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"example.com/dfs/internal/app"
 	"example.com/dfs/internal/metadata"
 	"example.com/dfs/internal/metadata/bolt"
 	"example.com/dfs/internal/storage"
@@ -127,7 +126,7 @@ func TestFilesystemCrashRecovery(t *testing.T) {
 
 func crashFixture(t *testing.T, data string) {
 	t.Helper()
-	files, err := app.Open(data)
+	files, err := openEmbedded(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +184,7 @@ func TestMissingContentStopsRecoveryWithoutSweeping(t *testing.T) {
 	if err := content.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if reopened, err := app.Open(data); err == nil {
+	if reopened, err := openEmbedded(data); err == nil {
 		_ = reopened.Close()
 		t.Fatal("opened a namespace with missing content")
 	}
@@ -208,7 +207,7 @@ func TestLegacyBackingFilesArePreserved(t *testing.T) {
 	if err := os.WriteFile(filename, []byte("keep"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if files, err := app.Open(data); err == nil {
+	if files, err := openEmbedded(data); err == nil {
 		_ = files.Close()
 		t.Fatal("opened an unformatted directory with existing files")
 	} else if !strings.Contains(err.Error(), "empty -data directory") {
@@ -238,7 +237,7 @@ func TestEmptyMetadataDoesNotReformatExistingObjects(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(data, "metadata.db"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if files, err := app.Open(data); err == nil {
+	if files, err := openEmbedded(data); err == nil {
 		_ = files.Close()
 		t.Fatal("empty metadata was initialized over existing content")
 	}

@@ -14,9 +14,19 @@ import (
 	"github.com/jacobsa/fuse/fuseutil"
 )
 
+// MountedFS couples a FUSE mount to the engine resources owned by its VFS.
+type MountedFS struct {
+	*fuse.MountedFileSystem
+	files *vfs.FS
+}
+
+// Close releases engines after a successful unmount. Some drivers retain the
+// device reader until daemon exit, so engine cleanup must not depend on Join.
+func (m *MountedFS) Close() error { return m.files.Close() }
+
 // Mount validates the paths, opens the engines, and serves an empty mountpoint.
 // Unmount with fuse.Unmount or the operating system's umount command.
-func Mount(data, mountpoint string) (*fuse.MountedFileSystem, error) {
+func Mount(data, mountpoint string, config Config) (*MountedFS, error) {
 	if err := os.MkdirAll(data, 0o700); err != nil {
 		return nil, err
 	}
@@ -50,7 +60,7 @@ func Mount(data, mountpoint string) (*fuse.MountedFileSystem, error) {
 	if len(entries) != 0 {
 		return nil, errors.New("mountpoint must be empty")
 	}
-	files, err := Open(data)
+	files, err := Open(data, config)
 	if err != nil {
 		return nil, fmt.Errorf("open backing directory: %w", err)
 	}
@@ -61,7 +71,7 @@ func Mount(data, mountpoint string) (*fuse.MountedFileSystem, error) {
 // It takes ownership of files, closing it on failure. On success FUSE calls
 // Destroy when the connection ends, closing the filesystem and its adapters.
 // The caller ensures the mountpoint is separate from all local provider paths.
-func MountFS(files *vfs.FS, mountpoint string) (_ *fuse.MountedFileSystem, err error) {
+func MountFS(files *vfs.FS, mountpoint string) (_ *MountedFS, err error) {
 	if files == nil {
 		return nil, errors.New("filesystem is required")
 	}
@@ -96,5 +106,5 @@ func MountFS(files *vfs.FS, mountpoint string) (_ *fuse.MountedFileSystem, err e
 	if err != nil {
 		return nil, fmt.Errorf("mount filesystem: %w", err)
 	}
-	return mounted, nil
+	return &MountedFS{MountedFileSystem: mounted, files: files}, nil
 }

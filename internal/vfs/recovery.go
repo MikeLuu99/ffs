@@ -28,6 +28,11 @@ func (f *FS) recover() error {
 		if live[inode.Object] {
 			return fmt.Errorf("content object shared by multiple inodes: %s", inode.Object)
 		}
+		if verifier, ok := f.store.(storage.ContentVerifier); ok {
+			if err := verifier.Verify(inode.Object); err != nil {
+				return fmt.Errorf("verify content for inode %d: %w", inode.ID, err)
+			}
+		}
 		file, err := f.store.Open(inode.Object, storage.ReadOnly)
 		if err != nil {
 			return fmt.Errorf("open content for inode %d: %w", inode.ID, err)

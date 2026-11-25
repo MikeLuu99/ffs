@@ -11,11 +11,20 @@ import (
 
 	"example.com/dfs/internal/metadata"
 	"example.com/dfs/internal/metadata/bolt"
+	"example.com/dfs/internal/metadata/redis"
+	"example.com/dfs/internal/metadata/redistest"
 )
 
 // Each metadata adapter must satisfy these namespace and atomicity contracts.
 func TestMetadataAdapters(t *testing.T) {
 	for name, open := range map[string]func(*testing.T) metadata.Engine{
+		"redis": func(t *testing.T) metadata.Engine {
+			engine, err := redis.Open(redistest.Config(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return engine
+		},
 		"bolt": func(t *testing.T) metadata.Engine {
 			engine, err := bolt.Open(filepath.Join(t.TempDir(), "metadata.db"))
 			if err != nil {
