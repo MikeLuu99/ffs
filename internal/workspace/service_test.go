@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func newWorkspace(ctx context.Context, t *testing.T, s *coreStack, actor Princip
 		t.Fatal(err)
 	}
 	defer releaseTestPin(ctx, t, s.files, actor, pin.ID)
-	ws, err := s.files.CreateWorkspace(ctx, actor, space, pin.Snapshot, WorkspaceID(id), 0)
+	ws, err := s.files.CreateWorkspace(ctx, actor, space, pin.Snapshot, ID(id), 0)
 	if err != nil {
 		t.Fatal(err)
 	}

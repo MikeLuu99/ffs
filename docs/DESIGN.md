@@ -1,6 +1,6 @@
 # Design Doc: Org-Wide Distributed File System for Humans + AI Agents
 
-Status: **v2 — incorporates the 2026-11-24 design review** (`docs/reviews/2026-11-24-design-review.md`) and aligns with the reference abstractions in `go/agentfs/`.
+Status: **v2 — incorporates the 2026-11-24 design review** (`docs/reviews/2026-11-24-design-review.md`) and aligns with the reference abstractions in `internal/workspace/`.
 v1 draft is preserved unchanged at `docs/DESIGN-v1.md`.
 Date: 2026-11-24
 
@@ -86,7 +86,7 @@ These are materially different architectures. v1's dismissal of Git ("single pac
 
 ## 5. High-Level Architecture
 
-Components correspond 1:1 to the Go contracts in `go/agentfs/` (`ports.go`). The module implements the `Publisher` coordinator; storage and policy components are interfaces awaiting adapters.
+Components correspond 1:1 to the Go contracts in `internal/workspace/` (`store.go`). The module implements the `Publisher` coordinator; storage and policy components are interfaces awaiting adapters.
 
 ```mermaid
 flowchart TD
@@ -107,7 +107,7 @@ flowchart TD
     builder --> draftstore
 ```
 
-| Component | Owns | Contract (`go/agentfs/ports.go`) |
+| Component | Owns | Contract (`internal/workspace/store.go`) |
 |---|---|---|
 | API/CLI/MCP adapter | Identity, authz of requested paths, context/deadlines, error translation | establishes trusted `Principal` |
 | `BlobStore` | File bytes | verify full digest/size, create-only immutable storage, space-scoped keys |
@@ -150,7 +150,7 @@ BlobRegistration { security_domain, sha256, size, storage_key, verification_stat
 DerivedTree { changeset_id, index_format_version, root_hash, readiness }
 ```
 
-Semantics (from `go/agentfs/model.go`):
+Semantics (from `internal/workspace/model.go`):
 
 - **`Version{Exists, Digest}`** represents a known value **or known absence**. Creating a file requires `Before.Exists == false`; replacing/deleting requires an exact expected digest. This makes "create" and "delete" races explicit instead of silent.
 - **Changeset IDs** are computed from a versioned canonical serialization (implementation-defined; `json.Marshal` of the DTO is not the format). Server-assigned time and authenticated attribution are fixed once per idempotent request; user-supplied author strings never establish identity.
@@ -285,7 +285,7 @@ Two agents start at `main@gen 41`:
 | B reads `pricing.json`, writes `forecast.md`; A changes `pricing.json` | If B declared that input, `DEPENDENCY_CHANGED` — recompute or resolve explicitly. Different output paths do not prove independence. |
 | B lists a directory to establish no contract exists; A adds one | Subtree fingerprint dependency detects the phantom read. |
 
-**Error taxonomy** (Go sentinels in `go/agentfs/errors.go`, mapped 1:1 to API error codes):
+**Error taxonomy** (Go sentinels in `internal/workspace/errors.go`, mapped 1:1 to API error codes):
 
 | Error | Meaning | Retryable |
 |---|---|---|
@@ -390,7 +390,7 @@ dfs_watch(prefix) / dfs_events(cursor)
 
 ## 11. Identity, Authorization, Audit
 
-- **Principals** (`go/agentfs/model.go` `Principal`): `ID`, `Owner` (human/team responsible), `Kind` (human/agent/service), `Tool`, `RunID` — from a trusted authentication layer only. Agent identity is mandatory on every write; author strings never establish identity.
+- **Principals** (`internal/workspace/model.go` `Principal`): `ID`, `Owner` (human/team responsible), `Kind` (human/agent/service), `Tool`, `RunID` — from a trusted authentication layer only. Agent identity is mandatory on every write; author strings never establish identity.
 - ACLs at space + path-prefix granularity, evaluated by adapters before exposing paths/bytes, and **re-enforced inside the publication transaction** (preparation-time checks can go stale).
 - **Audit honesty**: distinguish *issuing a download URL*, *observing object requests*, and *actual consumption*. A presigned-URL issuance record does not prove who downloaded the bytes — use mediated downloads where strict per-request attribution is required, otherwise document the capability's lifetime and audit limits. Restrict audit-log mutation; define any stronger tamper-evidence explicitly.
 - Physical **deduplication is scoped to compatible security domains** (encryption, retention, access); space-level isolation is the conservative default. Hash-existence probes must not become a cross-domain information channel. Classification/approval rules apply when files move into less restricted paths.
@@ -477,7 +477,7 @@ dfs_watch(prefix) / dfs_events(cursor)
 | Expired reservation holder resumes (if shipped) | Old epoch cannot publish |
 | Restore after supported DB failure | Bytes, refs, publication records, retention roots coherent |
 
-**Validation status of the reference abstractions:** `go/agentfs` (`go vet` clean; `go test -race ./...` passing) covers the `Publisher` coordinator: rebuild-and-revalidate after head movement, original-receipt replay, strict CAS, stale inputs, required approval, permit binding, bounded retries, cancellation, and concurrent duplicates. The storage/policy adapters (SQL, S3, persistent trees, canonical changeset encoding, HTTP/MCP transport, production authz) do not exist yet — see `go/agentfs/README.md` integration requirements 1–7.
+**Validation status of the reference abstractions:** `internal/workspace` (`go vet` clean; `go test -race ./...` passing) covers the `Publisher` coordinator: rebuild-and-revalidate after head movement, original-receipt replay, strict CAS, stale inputs, required approval, permit binding, bounded retries, cancellation, and concurrent duplicates. The storage/policy adapters (SQL, S3, persistent trees, canonical changeset encoding, HTTP/MCP transport, production authz) do not exist yet — see `docs/WORKSPACE.md` integration requirements 1–7.
 
 ---
 
@@ -500,5 +500,5 @@ dfs_watch(prefix) / dfs_events(cursor)
 3. AWS, [How to prevent object overwrites with conditional writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html), accessed Nov 24, 2026.
 4. AWS Prescriptive Guidance, [Transactional outbox pattern](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html), accessed Nov 24, 2026.
 5. etcd maintainers, [Lease expiry and fencing example](https://github.com/etcd-io/etcd/blob/main/contrib/lock/README.md), accessed Nov 24, 2026.
-6. `go/agentfs/` — reference domain contracts and publication coordinator (this repo).
+6. `internal/workspace/` — reference domain contracts and publication coordinator (this repo).
 7. `docs/reviews/2026-11-24-design-review.md` — the review this revision incorporates.

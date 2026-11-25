@@ -1,26 +1,26 @@
-# agentfs
+# Workspace domain reference
 
 Go abstractions for a versioned organizational workspace shared by humans and agents.
 
 The central rules are **save work independently; publish shared state atomically**, and **stable file identity**: a `FileID` follows a logical document across edits and moves; a blob digest identifies exact bytes.
 
-This module contains domain types, adapter contracts, the publication coordinator, filesystem-facing application services, working-copy synchronization, and capability/search/session contracts. It uses the standard library and targets Go 1.22 or later. `example.com/agentfs` is a local placeholder module path.
+The `internal/workspace` package contains domain types, adapter contracts, the publication coordinator, filesystem-facing application services, working-copy synchronization, and capability/search/session contracts. It uses the standard library and targets Go 1.22 or later. `example.com/agentfs` is a local placeholder module path.
 
 ## Main abstractions
 
 | Abstraction | Responsibility | Location |
 |---|---|---|
-| `BlobStore` | Verify and store immutable, space-scoped file bytes. | `ports.go` |
-| `TreeStore` | Apply deltas to persistent trees; resolve paths at an exact root; enforce FileID identity rules. | `ports.go`, `model.go` |
-| `DraftStore` / `SnapshotStore` | Save private progress, resolve snapshots, protect retention. | `ports.go` |
-| `CandidateBuilder` / `PublicationPolicy` | Prepare a safe candidate (rebased onto the current head, dependencies validated) and obtain checks bound to it. | `ports.go` |
-| `PublicationStore` | Atomically move a ref, record audit/outbox events, and store the retry receipt. | `ports.go` |
-| `Publisher` | Coordinate preparation, validation, bounded CAS retries, and result replay. | `publisher.go` |
-| `FileService` | Filesystem-facing API (`ReadFile`, `Stat`, `List`, `WriteFile`, `Move`, `Copy`, `Delete`, `Commit`): verified staging, mandatory preconditions, atomic multi-file changesets, snapshot-consistent reads. | `fsapi.go` |
-| `WorkingCopyManager` | Local checkout and synchronization: durable sync journal, crash recovery, idempotent retries, reconnect conflict detection. | `workingcopy.go` |
-| `SearchIndex` / `FileMetaStore` | Derived read models: filename/full-text search with freshness, FileID history and annotations. | `search.go`, `identity.go` |
-| `Capabilities` / `CapabilityDiscoverer` | Negotiated guarantees and transfer limits; unsupported features fail explicitly. | `capabilities.go` |
-| `DocumentSession` | Future live-collaboration boundary (explicitly unsupported in v1). | `session.go` |
+| `BlobStore` | Verify and store immutable, space-scoped file bytes. | [store.go](../internal/workspace/store.go) |
+| `TreeStore` | Apply deltas to persistent trees; resolve paths at an exact root; enforce FileID identity rules. | [store.go](../internal/workspace/store.go), [model.go](../internal/workspace/model.go) |
+| `DraftStore` / `SnapshotStore` | Save private progress, resolve snapshots, protect retention. | [store.go](../internal/workspace/store.go) |
+| `CandidateBuilder` / `PublicationPolicy` | Prepare a safe candidate (rebased onto the current head, dependencies validated) and obtain checks bound to it. | [store.go](../internal/workspace/store.go) |
+| `PublicationStore` | Atomically move a ref, record audit/outbox events, and store the retry receipt. | [store.go](../internal/workspace/store.go) |
+| `Publisher` | Coordinate preparation, validation, bounded CAS retries, and result replay. | [publisher.go](../internal/workspace/publisher.go) |
+| `FileService` | Filesystem-facing API (`ReadFile`, `Stat`, `List`, `WriteFile`, `Move`, `Copy`, `Delete`, `Commit`): verified staging, mandatory preconditions, atomic multi-file changesets, snapshot-consistent reads. | [service.go](../internal/workspace/service.go) |
+| `WorkingCopyManager` | Local checkout and synchronization: durable sync journal, crash recovery, idempotent retries, reconnect conflict detection. | [workingcopy.go](../internal/workspace/workingcopy.go) |
+| `SearchIndex` / `FileMetaStore` | Derived read models: filename/full-text search with freshness, FileID history and annotations. | [search.go](../internal/workspace/search.go), [identity.go](../internal/workspace/identity.go) |
+| `Capabilities` / `CapabilityDiscoverer` | Negotiated guarantees and transfer limits; unsupported features fail explicitly. | [capabilities.go](../internal/workspace/capabilities.go) |
+| `DocumentSession` | Future live-collaboration boundary (explicitly unsupported in v1). | [session.go](../internal/workspace/session.go) |
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for diagrams and worked examples.
 
@@ -66,25 +66,25 @@ The storage, candidate-building, snapshot, and policy interfaces are contracts. 
 2. Implement verified ingest plus metadata registration. A blob must be marked verified and retained before a draft references it; `BlobStore.Put` alone does not publish a file.
 3. Implement persistent, structurally shared tree nodes (bounded-size directory pages, no full-namespace rewrites) and canonical changeset hashing. Validate paths, expected old values, cross-space references, and mutation/input consistency; mint FileIDs per the identity rules.
 4. Implement draft save, resolve-and-pin, and workspace transactions with GC barriers.
-5. Implement `TryPublish` exactly as documented in `ports.go`, including current authorization and policy checks inside the atomic update.
+5. Implement `TryPublish` exactly as documented in [store.go](../internal/workspace/store.go), including current authorization and policy checks inside the atomic update.
 6. Implement the builder to check both file and directory dependencies against the candidate base and to rebase saved deltas onto the current head before publication. File digests alone cannot catch directory phantom reads.
 7. Implement authenticated, snapshot-bound policy evidence and an outbox dispatcher with at-least-once delivery and deduplication.
 8. Expose capability discovery in every transport (REST, CLI, MCP, mount); a transport must enforce a requested guarantee or return `ErrUnsupportedCapability` — never silently drop a precondition.
 9. Implement a file-backed `SyncJournal` and `LocalCache` (write-ahead: journal before acting; never evict content with unconfirmed entries), and a search worker feeding from outbox events.
 
-## Check the module
+## Check from the repository root
 
 ```sh
-gofmt -w *.go
+gofmt -w internal/workspace/*.go
 go vet ./...
 go test -race ./...
 ```
 
 With golangci-lint v2.15.0 installed, run the expanded audit profile from this
-module directory:
+repository root:
 
 ```sh
-golangci-lint run --config=../../docs/reviews/golangci-lint.yml ./...
+golangci-lint run ./...
 ```
 
 The profile checks production and test files, including discarded errors and

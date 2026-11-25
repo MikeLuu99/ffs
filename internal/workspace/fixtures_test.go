@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"context"
@@ -402,7 +402,7 @@ func (s *memTreeStore) List(ctx context.Context, space SpaceID, root TreeID, pre
 type memDraftStore struct {
 	mu    sync.Mutex
 	blobs *memBlobStore
-	ws    map[WorkspaceID]*Workspace
+	ws    map[ID]*Workspace
 	cs    map[ChangesetID]Changeset
 	roots map[ChangesetID]TreeID
 	ops   map[operationScope]struct {
@@ -414,7 +414,7 @@ type memDraftStore struct {
 func newMemDrafts(blobs *memBlobStore) *memDraftStore {
 	return &memDraftStore{
 		blobs: blobs,
-		ws:    make(map[WorkspaceID]*Workspace),
+		ws:    make(map[ID]*Workspace),
 		cs:    make(map[ChangesetID]Changeset),
 		roots: make(map[ChangesetID]TreeID),
 		ops: make(map[operationScope]struct {
@@ -424,7 +424,7 @@ func newMemDrafts(blobs *memBlobStore) *memDraftStore {
 	}
 }
 
-func (d *memDraftStore) CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id WorkspaceID, _ time.Duration) (Workspace, error) {
+func (d *memDraftStore) CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id ID, _ time.Duration) (Workspace, error) {
 	if err := ctx.Err(); err != nil {
 		return Workspace{}, err
 	}
@@ -444,7 +444,7 @@ func (d *memDraftStore) CreateWorkspace(ctx context.Context, actor Principal, sp
 	return ws, nil
 }
 
-func (d *memDraftStore) Workspace(_ context.Context, space SpaceID, id WorkspaceID) (Workspace, error) {
+func (d *memDraftStore) Workspace(_ context.Context, space SpaceID, id ID) (Workspace, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	ws, ok := d.ws[id]
@@ -924,7 +924,7 @@ func (s *coreStack) publishDirect(ctx context.Context, actor Principal, space Sp
 		return Receipt{}, Workspace{}, err
 	}
 	defer func() { err = errors.Join(err, s.files.ReleasePin(ctx, actor, pin.ID)) }()
-	ws, err = s.files.CreateWorkspace(ctx, actor, space, pin.Snapshot, WorkspaceID("ws-"+key), 0)
+	ws, err = s.files.CreateWorkspace(ctx, actor, space, pin.Snapshot, ID("ws-"+key), 0)
 	if err != nil {
 		return Receipt{}, Workspace{}, err
 	}

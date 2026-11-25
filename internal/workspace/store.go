@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"context"
@@ -42,9 +42,9 @@ type DraftStore interface {
 	// CreateWorkspace bootstraps a private draft lineage based on a pinned
 	// snapshot. Creating an existing workspace with identical parameters is
 	// idempotent; a conflicting reuse is an error.
-	CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id WorkspaceID, ttl time.Duration) (Workspace, error)
+	CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id ID, ttl time.Duration) (Workspace, error)
 	// Workspace returns the current workspace state (head, generation).
-	Workspace(ctx context.Context, space SpaceID, id WorkspaceID) (Workspace, error)
+	Workspace(ctx context.Context, space SpaceID, id ID) (Workspace, error)
 	Save(ctx context.Context, draft SaveDraft) (Workspace, error)
 	Load(ctx context.Context, space SpaceID, id ChangesetID) (Changeset, error)
 	Root(ctx context.Context, snapshot Snapshot) (TreeID, error)

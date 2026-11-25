@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func seedRemoteFiles(ctx context.Context, t *testing.T, stack *coreStack, files 
 		t.Fatal(err)
 	}
 	defer releaseTestPin(ctx, t, stack.files, other, pin.ID)
-	ws, err := stack.files.CreateWorkspace(ctx, other, "acme", pin.Snapshot, WorkspaceID("seed"), 0)
+	ws, err := stack.files.CreateWorkspace(ctx, other, "acme", pin.Snapshot, ID("seed"), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ type failingCommitService struct {
 	failOnce bool
 }
 
-func (f *failingCommitService) Commit(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req CommitRequest) (Workspace, error) {
+func (f *failingCommitService) Commit(ctx context.Context, actor Principal, space SpaceID, workspace ID, req CommitRequest) (Workspace, error) {
 	if f.failOnce {
 		f.failOnce = false
 		return Workspace{}, fmt.Errorf("simulated crash during save")

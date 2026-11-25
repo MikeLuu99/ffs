@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import "errors"
 

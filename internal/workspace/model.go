@@ -1,10 +1,10 @@
-// Package agentfs defines the storage contracts and publication workflow for an
+// Package workspace defines the storage contracts and publication workflow for an
 // online, versioned workspace shared by humans and agents.
 //
 // Blob bytes and saved changesets are immutable. Saving a changeset does not
 // move a shared ref. Publishing moves a ref in one metadata transaction.
 // Public methods take a context; implementations must support concurrent calls.
-package agentfs
+package workspace
 
 import (
 	"fmt"
@@ -18,8 +18,8 @@ type (
 	SpaceID string
 	// PrincipalID identifies an authenticated human, agent, or service.
 	PrincipalID string
-	// WorkspaceID identifies a private draft lineage.
-	WorkspaceID string
+	// ID identifies a private draft lineage.
+	ID string
 	// ChangesetID identifies an immutable saved delta.
 	ChangesetID string
 	// TreeID identifies an immutable materialized path index.
@@ -245,7 +245,7 @@ type Ref struct {
 // Workspace is a private draft lineage and a retention root. Updating its head
 // has its own CAS generation; it does not update main.
 type Workspace struct {
-	ID         WorkspaceID
+	ID         ID
 	Owner      PrincipalID
 	Space      SpaceID
 	Base       ChangesetID
@@ -259,7 +259,7 @@ type Workspace struct {
 // a caller cannot supply a replacement owner or retention policy.
 type SaveDraft struct {
 	Operation          OperationKey
-	Workspace          WorkspaceID
+	Workspace          ID
 	ExpectedGeneration uint64
 	Changeset          Changeset
 	Root               TreeID

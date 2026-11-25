@@ -1,7 +1,7 @@
 version: "2"
 
-# Audit profile for go/agentfs; run from that module with --config pointing here.
-# This intentionally reports existing findings; it does not suppress a baseline.
+# Run from the repository root: golangci-lint run ./...
+# Checks production and test code without suppressing an existing baseline.
 run:
   timeout: 3m
   tests: true

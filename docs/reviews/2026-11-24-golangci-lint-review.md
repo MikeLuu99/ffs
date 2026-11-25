@@ -1,6 +1,6 @@
 # golangci-lint audit
 
-Date: 2026-11-24. Scope: all production and test Go files in `go/agentfs`.
+Date: 2026-11-24. Scope: all production and test Go files in `internal/workspace`.
 
 ## Resolution
 
@@ -36,7 +36,7 @@ The downloaded archive's SHA-256 matched the GitHub release asset digest:
 ## Initial results
 
 The standard profile reports **4 diagnostics** (3 errcheck, 1 staticcheck).
-The expanded [audit profile](golangci-lint.yml), including explicit checks of
+The expanded [audit profile](../../.golangci.yml), including explicit checks of
 errors assigned to `_`, reports **110 diagnostics**: 83 in production files
 and 27 in test files. These are diagnostic counts, not distinct bug counts;
 some rules overlap. The intermediate expanded run without strict errcheck
@@ -53,13 +53,13 @@ reported 95 diagnostics. gofmt and goimports reported no formatting issues.
 | errorlint | 1 | An underlying encoding error is formatted with `%v`, losing its chain |
 | gosec | 1 | G115 uint64-to-int64 conversion in a test-only fake timestamp; no production vulnerability established |
 
-Full diagnostic output: [2026-11-24-golangci-lint-findings.txt](2026-11-24-golangci-lint-findings.txt).
+Full diagnostic output: [2026-11-24-golangci-lint-findings.txt](../../testdata/lint/2026-11-24-golangci-lint-findings.txt).
 
 ## Prioritized findings
 
 ### P1: Move can silently lose unpublished local content
 
-Location: [workingcopy.go:347](../../go/agentfs/workingcopy.go#L347).
+Location: [workingcopy.go:347](../../internal/workspace/workingcopy.go#L347).
 
 `Move` ignores an error writing destination content, then deletes the source
 and records the move as successful. If destination storage fails (for example,
@@ -84,7 +84,7 @@ source unpublished content lost: data="" err=agentfs: not found
 destination also absent: agentfs: not found
 ```
 
-The reproduction is saved as [2026-11-24-golangci-lint-repro.go.txt](2026-11-24-golangci-lint-repro.go.txt).
+The reproduction is saved as [2026-11-24-golangci-lint-repro.go.txt](../../testdata/lint/2026-11-24-golangci-lint-repro.go.txt).
 It is not part of the normal test suite. Copy the module to a temporary
 directory, place its contents in `lint_regression_test.go`, and run:
 
@@ -98,11 +98,11 @@ across partial failures. Add this scenario to the permanent regression suite.
 
 ### Error-handling improvements
 
-- [fsapi.go:259](../../go/agentfs/fsapi.go#L259): `ReadFile` ignores `reader.Close`.
+- [service.go:259](../../internal/workspace/service.go#L259): `ReadFile` ignores `reader.Close`.
   Decide whether the blob adapter's close error can indicate failed stream
   completion; propagate it when relevant, or explicitly document best-effort
   cleanup. This finding alone does not establish corrupt reads.
-- [workingcopy.go:376](../../go/agentfs/workingcopy.go#L376): `Status` discards
+- [workingcopy.go:376](../../internal/workspace/workingcopy.go#L376): `Status` discards
   pin-release errors. A failed release can hold retention resources until
   expiry. Define an observable best-effort cleanup policy or return the error.
 - Several tests ignore staging, head lookup, and journal lookup errors. These
@@ -112,23 +112,23 @@ across partial failures. Add this scenario to the permanent regression suite.
 
 ### Go conventions and maintainability
 
-- [workingcopy.go:503](../../go/agentfs/workingcopy.go#L503): simplify the loop
+- [workingcopy.go:503](../../internal/workspace/workingcopy.go#L503): simplify the loop
   to `result.Outcomes = append(result.Outcomes, conflicts...)`.
-- [capabilities.go:72](../../go/agentfs/capabilities.go#L72),
-  [capabilities.go:90](../../go/agentfs/capabilities.go#L90), and
-  [fsapi.go:155](../../go/agentfs/fsapi.go#L155): rename `cap` to `capability`.
-- [memstores_test.go:112](../../go/agentfs/memstores_test.go#L112): rename
+- [capabilities.go:72](../../internal/workspace/capabilities.go#L72),
+  [capabilities.go:90](../../internal/workspace/capabilities.go#L90), and
+  [service.go:155](../../internal/workspace/service.go#L155): rename `cap` to `capability`.
+- [fixtures_test.go:112](../../internal/workspace/fixtures_test.go#L112): rename
   `space_trees` to `spaceTrees`.
 - Add or correct exported API comments and mark intentionally unused parameters
   explicitly. The unsupported session implementation accounts for many unused
   parameter warnings; these do not establish missing session functionality.
-- [workingcopy.go:532](../../go/agentfs/workingcopy.go#L532) and
-  [workingcopy.go:710](../../go/agentfs/workingcopy.go#L710): make unsupported
+- [workingcopy.go:532](../../internal/workspace/workingcopy.go#L532) and
+  [workingcopy.go:710](../../internal/workspace/workingcopy.go#L710): make unsupported
   `OpCopy` handling explicit. The first switch already rejects unsupported
   values through `default`; the second silently skips them. Current public
   working-copy methods cannot create copy entries, so these findings are
   defensive completeness warnings rather than reproduced copy failures.
-- [publisher.go:167](../../go/agentfs/publisher.go#L167): consider `%w` for the
+- [publisher.go:167](../../internal/workspace/publisher.go#L167): consider `%w` for the
   nested encoding error if it is intended to remain inspectable. The current
   wire struct contains supported JSON types, making this low priority.
 
@@ -140,10 +140,9 @@ CLI reference: <https://golangci-lint.run/docs/configuration/cli/>.
 From the module directory, using golangci-lint v2.15.0 on PATH:
 
 ```sh
-cd go/agentfs
 golangci-lint run --no-config --timeout=3m --max-issues-per-linter=0 --max-same-issues=0 ./...
-golangci-lint config verify --config=../../docs/reviews/golangci-lint.yml
-golangci-lint run --config=../../docs/reviews/golangci-lint.yml ./...
+golangci-lint config verify --config=.golangci.yml
+golangci-lint run --config=.golangci.yml ./...
 ```
 
 The config validates successfully. Finding exit status is 1, as expected.

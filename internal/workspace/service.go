@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"bytes"
@@ -64,9 +64,9 @@ type FileService interface {
 	ReleasePin(ctx context.Context, actor Principal, pinID string) error
 
 	// CreateWorkspace bootstraps a private draft lineage on a snapshot.
-	CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id WorkspaceID, ttl time.Duration) (Workspace, error)
+	CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id ID, ttl time.Duration) (Workspace, error)
 	// Workspace returns the current state of a private workspace.
-	Workspace(ctx context.Context, actor Principal, space SpaceID, id WorkspaceID) (Workspace, error)
+	Workspace(ctx context.Context, actor Principal, space SpaceID, id ID) (Workspace, error)
 
 	// ReadFile returns the content and stat of one path in one snapshot.
 	ReadFile(ctx context.Context, actor Principal, space SpaceID, snap Snapshot, path string) ([]byte, FileStat, error)
@@ -81,13 +81,13 @@ type FileService interface {
 	// Expected is REQUIRED: a replacement names the digest it replaces and a
 	// creation declares expected absence. A nil Expected is rejected with
 	// ErrPreconditionRequired, never defaulted.
-	WriteFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req WriteFileRequest) (Workspace, error)
+	WriteFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req WriteFileRequest) (Workspace, error)
 	// Commit records several mutations as ONE atomic changeset: readers of
 	// any snapshot never see a partial group.
-	Commit(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req CommitRequest) (Workspace, error)
-	MoveFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req MoveFileRequest) (Workspace, error)
-	CopyFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req CopyFileRequest) (Workspace, error)
-	DeleteFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req DeleteFileRequest) (Workspace, error)
+	Commit(ctx context.Context, actor Principal, space SpaceID, workspace ID, req CommitRequest) (Workspace, error)
+	MoveFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req MoveFileRequest) (Workspace, error)
+	CopyFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req CopyFileRequest) (Workspace, error)
+	DeleteFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req DeleteFileRequest) (Workspace, error)
 }
 
 // WriteFileRequest saves one conditional content replacement or creation.
@@ -202,7 +202,7 @@ func (s *fileService) ReleasePin(ctx context.Context, actor Principal, pinID str
 	return s.snaps.ReleasePin(ctx, actor, pinID)
 }
 
-func (s *fileService) CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id WorkspaceID, ttl time.Duration) (Workspace, error) {
+func (s *fileService) CreateWorkspace(ctx context.Context, actor Principal, space SpaceID, base Snapshot, id ID, ttl time.Duration) (Workspace, error) {
 	if err := validatePrincipal(actor); err != nil {
 		return Workspace{}, err
 	}
@@ -215,7 +215,7 @@ func (s *fileService) CreateWorkspace(ctx context.Context, actor Principal, spac
 	return s.drafts.CreateWorkspace(ctx, actor, space, base, id, ttl)
 }
 
-func (s *fileService) Workspace(ctx context.Context, actor Principal, space SpaceID, id WorkspaceID) (Workspace, error) {
+func (s *fileService) Workspace(ctx context.Context, actor Principal, space SpaceID, id ID) (Workspace, error) {
 	if err := s.check(ctx, actor, space, "", AccessWrite); err != nil {
 		return Workspace{}, err
 	}
@@ -300,7 +300,7 @@ func (s *fileService) Stage(ctx context.Context, actor Principal, space SpaceID,
 	return s.blobs.Put(ctx, expected, bytes.NewReader(content))
 }
 
-func (s *fileService) WriteFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req WriteFileRequest) (Workspace, error) {
+func (s *fileService) WriteFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req WriteFileRequest) (Workspace, error) {
 	if req.Expected == nil {
 		return Workspace{}, fmt.Errorf("%w: WriteFile requires the expected version or expected absence", ErrPreconditionRequired)
 	}
@@ -312,7 +312,7 @@ func (s *fileService) WriteFile(ctx context.Context, actor Principal, space Spac
 	})
 }
 
-func (s *fileService) MoveFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req MoveFileRequest) (Workspace, error) {
+func (s *fileService) MoveFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req MoveFileRequest) (Workspace, error) {
 	if req.ExpectedFrom == nil || req.ExpectedTo == nil {
 		return Workspace{}, fmt.Errorf("%w: MoveFile requires expected versions for both paths", ErrPreconditionRequired)
 	}
@@ -322,7 +322,7 @@ func (s *fileService) MoveFile(ctx context.Context, actor Principal, space Space
 	})
 }
 
-func (s *fileService) CopyFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req CopyFileRequest) (Workspace, error) {
+func (s *fileService) CopyFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req CopyFileRequest) (Workspace, error) {
 	if req.ExpectedFrom == nil || req.ExpectedTo == nil {
 		return Workspace{}, fmt.Errorf("%w: CopyFile requires expected versions for both paths", ErrPreconditionRequired)
 	}
@@ -332,7 +332,7 @@ func (s *fileService) CopyFile(ctx context.Context, actor Principal, space Space
 	})
 }
 
-func (s *fileService) DeleteFile(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req DeleteFileRequest) (Workspace, error) {
+func (s *fileService) DeleteFile(ctx context.Context, actor Principal, space SpaceID, workspace ID, req DeleteFileRequest) (Workspace, error) {
 	if req.Expected == nil {
 		return Workspace{}, fmt.Errorf("%w: DeleteFile requires the expected version", ErrPreconditionRequired)
 	}
@@ -342,7 +342,7 @@ func (s *fileService) DeleteFile(ctx context.Context, actor Principal, space Spa
 	})
 }
 
-func (s *fileService) Commit(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, req CommitRequest) (Workspace, error) {
+func (s *fileService) Commit(ctx context.Context, actor Principal, space SpaceID, workspace ID, req CommitRequest) (Workspace, error) {
 	return s.commit(ctx, actor, space, workspace, commitInput{
 		ops: req.Ops, inputs: req.Inputs, message: req.Message, key: req.IdempotencyKey,
 	})
@@ -359,7 +359,7 @@ type commitInput struct {
 	content map[string][]byte
 }
 
-func (s *fileService) commit(ctx context.Context, actor Principal, space SpaceID, workspace WorkspaceID, in commitInput) (Workspace, error) {
+func (s *fileService) commit(ctx context.Context, actor Principal, space SpaceID, workspace ID, in commitInput) (Workspace, error) {
 	if err := validatePrincipal(actor); err != nil {
 		return Workspace{}, err
 	}
@@ -448,11 +448,11 @@ func (s *fileService) commit(ctx context.Context, actor Principal, space SpaceID
 // saveRequestHash is stable across retries of one logical save: it covers
 // the workspace, parent, operations, declared inputs, and message, but not
 // freshly minted changeset IDs or timestamps.
-func saveRequestHash(space SpaceID, workspace WorkspaceID, parent ChangesetID, ops []Mutation, inputs []Dependency, message string) Digest {
+func saveRequestHash(space SpaceID, workspace ID, parent ChangesetID, ops []Mutation, inputs []Dependency, message string) Digest {
 	wire := struct {
 		Version   int          `json:"version"`
 		Space     SpaceID      `json:"space"`
-		Workspace WorkspaceID  `json:"workspace"`
+		Workspace ID           `json:"workspace"`
 		Parent    ChangesetID  `json:"parent"`
 		Ops       []Mutation   `json:"ops"`
 		Inputs    []Dependency `json:"inputs"`

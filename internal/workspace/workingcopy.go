@@ -1,4 +1,4 @@
-package agentfs
+package workspace
 
 import (
 	"context"
@@ -108,7 +108,7 @@ type LocalCache interface {
 type WorkingCopy struct {
 	ID        string
 	Space     SpaceID
-	Workspace WorkspaceID
+	Workspace ID
 	Root      string // local directory (informational)
 	Target    RefName
 	CreatedAt time.Time
@@ -209,7 +209,7 @@ func (m *WorkingCopyManager) Checkout(ctx context.Context, actor Principal, spac
 		return nil, err
 	}
 	snap := pin.Snapshot
-	ws, err := m.files.CreateWorkspace(ctx, actor, space, snap, WorkspaceID("wc-"+copyID), 0)
+	ws, err := m.files.CreateWorkspace(ctx, actor, space, snap, ID("wc-"+copyID), 0)
 	if err != nil {
 		return nil, err
 	}
