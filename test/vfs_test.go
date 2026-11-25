@@ -12,14 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"example.com/dfs/internal/localfs"
+	"example.com/dfs/internal/app"
+	"example.com/dfs/internal/vfs"
 
 	"github.com/jacobsa/fuse/fuseops"
 )
 
-func openFS(t *testing.T, directory string) *localfs.FS {
+func openFS(t *testing.T, directory string) *vfs.FS {
 	t.Helper()
-	files, err := localfs.Open(directory)
+	files, err := app.Open(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +32,7 @@ func openFS(t *testing.T, directory string) *localfs.FS {
 	return files
 }
 
-func create(t *testing.T, files *localfs.FS, parent fuseops.InodeID, name string) fuseops.CreateFileOp {
+func create(t *testing.T, files *vfs.FS, parent fuseops.InodeID, name string) fuseops.CreateFileOp {
 	t.Helper()
 	op := fuseops.CreateFileOp{Parent: parent, Name: name, Mode: 0o600, OpenFlags: syscall.O_RDWR}
 	if err := files.CreateFile(context.Background(), &op); err != nil {
@@ -40,7 +41,7 @@ func create(t *testing.T, files *localfs.FS, parent fuseops.InodeID, name string
 	return op
 }
 
-func lookup(t *testing.T, files *localfs.FS, parent fuseops.InodeID, name string) fuseops.InodeID {
+func lookup(t *testing.T, files *vfs.FS, parent fuseops.InodeID, name string) fuseops.InodeID {
 	t.Helper()
 	op := fuseops.LookUpInodeOp{Parent: parent, Name: name}
 	if err := files.LookUpInode(context.Background(), &op); err != nil {
@@ -49,14 +50,14 @@ func lookup(t *testing.T, files *localfs.FS, parent fuseops.InodeID, name string
 	return op.Entry.Child
 }
 
-func write(t *testing.T, files *localfs.FS, file fuseops.CreateFileOp, value string, offset int64) {
+func write(t *testing.T, files *vfs.FS, file fuseops.CreateFileOp, value string, offset int64) {
 	t.Helper()
 	if err := files.WriteFile(context.Background(), &fuseops.WriteFileOp{Inode: file.Entry.Child, Handle: file.Handle, Data: []byte(value), Offset: offset}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func read(t *testing.T, files *localfs.FS, inode fuseops.InodeID, handle fuseops.HandleID) string {
+func read(t *testing.T, files *vfs.FS, inode fuseops.InodeID, handle fuseops.HandleID) string {
 	t.Helper()
 	op := fuseops.ReadFileOp{Inode: inode, Handle: handle, Dst: make([]byte, 1024), Size: 1024}
 	if err := files.ReadFile(context.Background(), &op); err != nil {
@@ -98,6 +99,9 @@ func TestRestartAndDirectoryRename(t *testing.T) {
 	files = openFS(t, data)
 	directory := lookup(t, files, fuseops.RootInodeID, "notes")
 	id := lookup(t, files, directory, "hello.txt")
+	if directory != dir.Entry.Child || id != file.Entry.Child {
+		t.Fatal("inode identity changed after restart")
+	}
 	opened := fuseops.OpenFileOp{Inode: id}
 	if err := files.OpenFile(ctx, &opened); err != nil {
 		t.Fatal(err)
@@ -240,10 +244,10 @@ func TestConcurrentAppend(t *testing.T) {
 	}
 }
 
-func TestBackingDirectoryLockAndSymlinks(t *testing.T) {
+func TestBackingDirectoryLockAndNamespaceIsolation(t *testing.T) {
 	data := t.TempDir()
 	files := openFS(t, data)
-	if second, err := localfs.Open(data); err == nil {
+	if second, err := app.Open(data); err == nil {
 		if err := second.Close(); err != nil {
 			t.Error(err)
 		}
@@ -256,7 +260,7 @@ func TestBackingDirectoryLockAndSymlinks(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(data, "escape")); err != nil {
 		t.Fatal(err)
 	}
-	if err := files.LookUpInode(context.Background(), &fuseops.LookUpInodeOp{Parent: fuseops.RootInodeID, Name: "escape"}); !errors.Is(err, syscall.ENOTSUP) {
-		t.Fatalf("symlink lookup = %v", err)
+	if err := files.LookUpInode(context.Background(), &fuseops.LookUpInodeOp{Parent: fuseops.RootInodeID, Name: "escape"}); !errors.Is(err, syscall.ENOENT) {
+		t.Fatalf("backing file leaked into metadata namespace: %v", err)
 	}
 }

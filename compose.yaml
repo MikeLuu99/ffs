@@ -1,5 +1,5 @@
 services:
-  singlefs:
+  dfs:
     build: .
     devices:
       - /dev/fuse:/dev/fuse

@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"example.com/dfs/internal/localfs"
+	"example.com/dfs/internal/app"
 
 	"github.com/jacobsa/fuse"
 )
@@ -23,12 +23,12 @@ type options struct {
 
 func parseArgs(args []string, output io.Writer) (options, error) {
 	config := options{mountpoint: "./mnt"}
-	flags := flag.NewFlagSet("singlefs", flag.ContinueOnError)
+	flags := flag.NewFlagSet("dfs", flag.ContinueOnError)
 	flags.SetOutput(output)
 	logger := log.New(output, "", 0)
 	flags.StringVar(&config.data, "data", "./data", "persistent backing directory")
 	flags.Usage = func() {
-		logger.Print("Usage: singlefs [-data directory] [mountpoint] (default ./mnt)")
+		logger.Print("Usage: dfs [-data directory] [mountpoint] (default ./mnt)")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -55,12 +55,12 @@ func run(args []string, output io.Writer) error {
 	if err := os.MkdirAll(config.mountpoint, 0o755); err != nil {
 		return fmt.Errorf("create mountpoint: %w", err)
 	}
-	mounted, err := localfs.Mount(config.data, config.mountpoint)
+	mounted, err := app.Mount(config.data, config.mountpoint)
 	if err != nil {
 		return err
 	}
 	logger := log.New(output, "", 0)
-	logger.Printf("Mounted singlefs at %s; Ctrl+C to unmount", mounted.Dir())
+	logger.Printf("Mounted dfs at %s; Ctrl+C to unmount", mounted.Dir())
 	stopped := make(chan error, 1)
 	go func() { stopped <- mounted.Join(context.Background()) }()
 	signals := make(chan os.Signal, 1)
