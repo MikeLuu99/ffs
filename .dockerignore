@@ -1,0 +1,12 @@
+.git
+data
+mnt
+main
+bin
+out
+*.test
+*.out
+coverage.html
+.env
+.env.*
+.DS_Store

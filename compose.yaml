@@ -1,0 +1,18 @@
+services:
+  singlefs:
+    build: .
+    devices:
+      - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    # Allow FUSE mount operations on engines with AppArmor enabled.
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "mountpoint", "-q", "/app/mnt"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    stop_grace_period: 15s

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -15,29 +16,50 @@ import (
 	"github.com/jacobsa/fuse"
 )
 
-func run(args []string, output io.Writer) error {
+type options struct {
+	data       string
+	mountpoint string
+}
+
+func parseArgs(args []string, output io.Writer) (options, error) {
+	config := options{mountpoint: "./mnt"}
 	flags := flag.NewFlagSet("singlefs", flag.ContinueOnError)
 	flags.SetOutput(output)
 	logger := log.New(output, "", 0)
-	data := flags.String("data", "./data", "persistent backing directory")
+	flags.StringVar(&config.data, "data", "./data", "persistent backing directory")
 	flags.Usage = func() {
-		logger.Print("Usage: singlefs [-data directory] mountpoint")
+		logger.Print("Usage: singlefs [-data directory] [mountpoint] (default ./mnt)")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
+		return options{}, err
+	}
+	if flags.NArg() > 1 {
+		flags.Usage()
+		return options{}, errors.New("provide at most one mountpoint")
+	}
+	if flags.NArg() == 1 {
+		config.mountpoint = flags.Arg(0)
+	}
+	return config, nil
+}
+
+func run(args []string, output io.Writer) error {
+	config, err := parseArgs(args, output)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
 		return err
 	}
-	if flags.NArg() != 1 {
-		flags.Usage()
-		return errors.New("provide exactly one mountpoint")
+	if err := os.MkdirAll(config.mountpoint, 0o755); err != nil {
+		return fmt.Errorf("create mountpoint: %w", err)
 	}
-	mounted, err := localfs.Mount(*data, flags.Arg(0))
+	mounted, err := localfs.Mount(config.data, config.mountpoint)
 	if err != nil {
 		return err
 	}
+	logger := log.New(output, "", 0)
 	logger.Printf("Mounted singlefs at %s; Ctrl+C to unmount", mounted.Dir())
 	stopped := make(chan error, 1)
 	go func() { stopped <- mounted.Join(context.Background()) }()
