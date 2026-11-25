@@ -1,0 +1,34 @@
+package agentfs
+
+import (
+    "context"
+    "errors"
+    "testing"
+)
+
+type auditFailDestinationCache struct { LocalCache }
+func (c auditFailDestinationCache) Put(ctx context.Context, copyID, path string, content []byte) error {
+    if path == "b.txt" { return errors.New("simulated disk full") }
+    return c.LocalCache.Put(ctx, copyID, path, content)
+}
+
+func TestAuditMovePreservesUnpublishedContentOnCacheFailure(t *testing.T) {
+    ctx := context.Background()
+    stack := newCoreStack(t, testCaps(), nil)
+    actor := testActor("editor")
+    seedRemoteFiles(t, stack, ctx, map[string]string{"a.txt": "original"})
+    journal, cache := newMemJournal(), newMemCache()
+    manager := newManager(t, stack, journal, cache, 2)
+    wc, err := manager.Checkout(ctx, actor, "acme", "main", "/tmp/audit-wc", "audit-copy")
+    if err != nil { t.Fatal(err) }
+    if _, err := manager.Write(ctx, actor, wc, "a.txt", nil, []byte("unpublished edit")); err != nil { t.Fatal(err) }
+    manager.cache = auditFailDestinationCache{LocalCache: cache}
+    _, moveErr := manager.Move(ctx, actor, wc, "a.txt", "b.txt", nil, nil)
+    if moveErr == nil { t.Error("Move reported success after destination cache write failed") }
+    if data, err := cache.Get(ctx, wc.ID, "a.txt"); err != nil || string(data) != "unpublished edit" {
+        t.Errorf("source unpublished content lost: data=%q err=%v", data, err)
+    }
+    if _, err := cache.Get(ctx, wc.ID, "b.txt"); err != nil {
+        t.Logf("destination also absent: %v", err)
+    }
+}

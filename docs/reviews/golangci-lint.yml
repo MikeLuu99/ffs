@@ -1,0 +1,55 @@
+version: "2"
+
+# Audit profile for go/agentfs; run from that module with --config pointing here.
+# This intentionally reports existing findings; it does not suppress a baseline.
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - asasalint
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - durationcheck
+    - errchkjson
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - gocritic
+    - gosec
+    - makezero
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - predeclared
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - testableexamples
+    - testifylint
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  settings:
+    errcheck:
+      check-blank: true
+      check-type-assertions: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
