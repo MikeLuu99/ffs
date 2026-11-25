@@ -1,47 +1,82 @@
-# agentfs
+# Single-node file system
 
-A versioned workspace for documents and artifacts shared by humans and AI
-agents. Save progress in a private workspace, then publish validated changes
-atomically to a shared `main` within each space.
-
-The Go implementation provides snapshot reads, conditional file operations,
-publication coordination, and working-copy synchronization. Storage adapters,
-HTTP/MCP transports, and background workers are still to be implemented.
+A single-process, disk-backed FUSE filesystem in Go. Files and metadata live in
+a local backing directory, exposed through a mount that ordinary commands can
+use. This is the first milestone toward a distributed filesystem.
 
 ```mermaid
-flowchart TD
-    Client[Human or AI agent] --> Read[Read a pinned snapshot]
-    Client --> Save[Save private edits]
-    Save --> Blobs[Verify and store immutable bytes]
-    Blobs --> Draft[Save changeset in a workspace]
-    Draft --> Prepare[Prepare publication against current main]
-    Prepare --> Checks[Validate dependencies, permissions, and policy]
-    Checks --> Commit[Atomically update main, audit, outbox, and receipt]
-    Commit --> Read
-    Commit -.-> Index[Derived search and history]
+flowchart LR
+    App[Shell commands and applications] --> FUSE[FUSE mount]
+    FUSE --> FS[localfs]
+    FS --> Disk[Backing directory]
 ```
 
-The diagram shows the intended service flow. Saving keeps work recoverable;
-publishing makes it shared. Conflicts preserve the saved proposal for resolution.
+Supports files and directories, offset reads/writes, append, truncate, permissions,
+timestamps, rename, deletion, and file/directory `fsync`. Open file descriptors
+remain valid after rename or unlink. Files and metadata persist in the backing
+filesystem across restarts.
+
+## Run
+
+Requires Go 1.25+ and a FUSE driver:
+
+- macOS: install [macFUSE](https://macfuse.github.io/) and complete its OS setup.
+- Linux: enable `/dev/fuse` and install `fusermount` or `fusermount3`.
+
+```sh
+mkdir -p mnt
+go run ./cmd/singlefs -data ./data ./mnt
+```
+
+The mountpoint must be an existing empty directory, separate from the backing
+directory. The command stays in the foreground while the filesystem is mounted.
+
+In another terminal:
+
+```sh
+mkdir mnt/docs
+printf 'hello\n' > mnt/docs/hello.txt
+cat mnt/docs/hello.txt
+mv mnt/docs/hello.txt mnt/docs/saved.txt
+```
+
+Press Ctrl+C in the mount process to unmount, then run the same mount command
+again and check persistence:
+
+```sh
+cat mnt/docs/saved.txt
+```
+
+External `umount ./mnt` also stops the process. Close open files if unmount
+reports that the filesystem is busy.
+
+## Layout and checks
 
 ```text
-cmd/api/             HTTP server entry point location (planned)
-cmd/worker/          Background worker entry point location (planned)
-internal/workspace/  Workspace domain, services, contracts, and colocated tests
-api/                Transport specifications (planned)
-migrations/         Database migrations (planned)
-testdata/           Test and audit fixtures
-docs/               Architecture, domain reference, and reviews
+cmd/singlefs/      Mount command and argument tests
+internal/localfs/  Filesystem operations and FUSE integration
+test/              Filesystem behavior and optional mounted smoke tests
 ```
-
-Run checks from the repository root with Go 1.22+ and golangci-lint v2.15.0:
 
 ```sh
 go test -race ./...
 go vet ./...
-golangci-lint run ./...
+# Optional, with golangci-lint installed:
+golangci-lint run --no-config ./...
+# With a FUSE driver installed:
+DFS_MOUNT_TEST=1 go test -race -run '^TestMountedFilesystem$' ./test
 ```
 
-The module currently uses only the standard library, so it has no `go.sum`.
-See the [architecture](docs/ARCHITECTURE.md), [domain reference](docs/WORKSPACE.md),
-and [design](docs/DESIGN.md) for details.
+The regular suite tests callbacks without mounting, including restart persistence,
+concurrent append, rename/unlink with open descriptors, and directory pagination.
+The opt-in smoke test mounts, writes, unmounts, mounts again, and reads the file.
+It is skipped unless `DFS_MOUNT_TEST=1`; callback tests alone do not verify a
+working kernel mount.
+
+## Current limits
+
+This is a single-user POSIX-style subset. Links, ownership changes, extended
+attributes, file locking, and full POSIX compliance are outside this first version.
+One process owns a backing directory at a time; change its contents through the
+mount while running. Inode metadata is cached until unmount. Data durability is
+provided by the host filesystem through `fsync`; replication comes later.

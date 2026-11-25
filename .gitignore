@@ -1,28 +1,30 @@
-# Binaries and build artifacts
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# Build and test output
 /bin/
 /out/
-
-# Test binaries and coverage
 *.test
 *.out
-coverage.txt
 coverage.html
 
-# Go workspace files
-go.work
-go.work.sum
-
-# Local environment and secrets
+# Local runtime data and configuration
+/data/
+/mnt/
 .env
 .env.*
-
-# Editors and OS
 .DS_Store
-.idea/
-.vscode/
-*.swp
+
+# Local design and agent instructions
+/docs/DESIGN.md
+AGENT*.md
+CLAUDE*.md
+GEMINI*.md
+CODEX*.md
+SKILL.md
+**/.agents/**/*.md
+**/.codex/**/*.md
+**/.claude/**/*.md
+**/.github/agents/**/*.md
+**/.github/instructions/**/*.md
+**/.github/prompts/**/*.md
+**/.github/copilot-instructions.md
+**/.cursor/**/*.md
+**/.windsurf/**/*.md
